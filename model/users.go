@@ -57,3 +57,11 @@ type ChangePassword struct {
 	New string `json:"new" binding:"required"`
 	Old string `json:"old" binding:"required"`
 }
+
+type GetManyUserParams struct {
+	Name     *string `json:"name"`
+	Email    *string `json:"email"`
+	IsDriver *bool   `json:"isDriver"`
+	Size     int64   `json:"size" binding:"required,min=1"`
+	Page     int64   `json:"page" binding:"required,min=1"`
+}

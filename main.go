@@ -10,6 +10,7 @@ import (
 	"github.com/Difaal21/nebeng-dong/databases/mariadb"
 	"github.com/Difaal21/nebeng-dong/jwt"
 	"github.com/Difaal21/nebeng-dong/middleware"
+	"github.com/Difaal21/nebeng-dong/modules/administrators"
 	"github.com/Difaal21/nebeng-dong/modules/passengers"
 	"github.com/Difaal21/nebeng-dong/modules/payment"
 	shareride "github.com/Difaal21/nebeng-dong/modules/share-ride"
@@ -43,6 +44,11 @@ func main() {
 
 	session := middleware.NewSession(jsonWebToken)
 
+	privateKeyAdmin := jwt.GetRSAPrivateKey(cfg.JWTAdmin.PrivateKey)
+	publicKeyAdmin := jwt.GetRSAPublicKey(cfg.JWTAdmin.PublicKey)
+	jsonWebTokenAdmin := jwt.NewJWT(privateKeyAdmin, publicKeyAdmin)
+	sessionAdmin := middleware.NewSession(jsonWebTokenAdmin)
+
 	mariaDb := mariadb.NewClientImpl(cfg.MariaDb.Driver, cfg.MariaDb.DSN)
 	db, err := mariaDb.Connect(cfg.MariaDb.MaxOpenConnections, cfg.MariaDb.MaxIdleConnections)
 	if err != nil {
@@ -62,6 +68,9 @@ func main() {
 	userRepository := users.NewRepositoryImpl(db, logger)
 	userUsecase := users.NewUsecaseImpl(userRepository, logger, vehicleRepository, jsonWebToken)
 	users.NewHTTPHandler(router, basicAuth, session, userUsecase)
+
+	adminUsecase := administrators.NewUsecaseImpl(logger, jsonWebTokenAdmin, userRepository)
+	administrators.NewHTTPHandler(router, basicAuth, sessionAdmin, adminUsecase)
 
 	passengersRepository := passengers.NewRepositoryImpl(db, logger)
 

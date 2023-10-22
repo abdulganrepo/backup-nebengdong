@@ -1,7 +1,6 @@
 package users
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/Difaal21/nebeng-dong/helpers/validation"
@@ -27,7 +26,7 @@ func NewHTTPHandler(router *gin.Engine, basicAuth *middleware.BasicAuth, session
 	}
 
 	router.POST("/nebengdong-service/v1/users/registration", basicAuth.Verify, handler.Registration)
-	router.POST("/nebengdong-service/v1/users/:id/top-up", basicAuth.Verify, handler.TopUpCoinBalance)
+	// router.POST("/nebengdong-service/v1/users/:id/top-up", basicAuth.Verify, handler.TopUpCoinBalance)
 	router.POST("/nebengdong-service/v1/users/login", basicAuth.Verify, handler.Login)
 	router.GET("/nebengdong-service/v1/users/profile", session.Verify, handler.GetProfile)
 	router.PUT("/nebengdong-service/v1/users/coordinate", session.Verify, handler.UpdateCoordinate)
@@ -116,35 +115,35 @@ func (handler *HTTPHandler) UpdateCoordinate(c *gin.Context) {
 	responses.REST(c, resp)
 }
 
-func (handler *HTTPHandler) TopUpCoinBalance(c *gin.Context) {
+// func (handler *HTTPHandler) TopUpCoinBalance(c *gin.Context) {
 
-	context := c.Request.Context()
+// 	context := c.Request.Context()
 
-	userIdStr := c.Param("id")
-	userId, _ := strconv.ParseInt(userIdStr, 10, 64)
+// 	userIdStr := c.Param("id")
+// 	userId, _ := strconv.ParseInt(userIdStr, 10, 64)
 
-	if c.Request.ContentLength < 1 {
-		responses.REST(c, httpResponse.UnprocessableEntity("").NewResponses(nil, "request body empty"))
-		return
-	}
+// 	if c.Request.ContentLength < 1 {
+// 		responses.REST(c, httpResponse.UnprocessableEntity("").NewResponses(nil, "request body empty"))
+// 		return
+// 	}
 
-	payload := &model.TopUpCoinBalance{
-		ID: userId,
-	}
+// 	payload := &model.TopUpCoinBalance{
+// 		ID: userId,
+// 	}
 
-	if err := c.ShouldBind(&payload); err != nil {
-		if errorFields, ok := err.(validator.ValidationErrors); ok {
-			schemas := validation.RequestBody(errorFields, payload)
-			responses.REST(c, httpResponse.BadRequest("").NewResponses(schemas, "Bad Request"))
-			return
-		}
-		responses.REST(c, httpResponse.UnprocessableEntity("").NewResponses(nil, err.Error()))
-		return
-	}
+// 	if err := c.ShouldBind(&payload); err != nil {
+// 		if errorFields, ok := err.(validator.ValidationErrors); ok {
+// 			schemas := validation.RequestBody(errorFields, payload)
+// 			responses.REST(c, httpResponse.BadRequest("").NewResponses(schemas, "Bad Request"))
+// 			return
+// 		}
+// 		responses.REST(c, httpResponse.UnprocessableEntity("").NewResponses(nil, err.Error()))
+// 		return
+// 	}
 
-	resp := handler.Usecase.TopUpCoinBalance(context, payload)
-	responses.REST(c, resp)
-}
+// 	resp := handler.Usecase.TopUpCoinBalance(context, payload)
+// 	responses.REST(c, resp)
+// }
 
 func (handler *HTTPHandler) ChangePhoneNumber(c *gin.Context) {
 	context := c.Request.Context()

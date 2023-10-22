@@ -4,14 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/Difaal21/nebeng-dong/entity"
 	"github.com/Difaal21/nebeng-dong/exception"
+	"github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 )
 
 type Repository interface {
 	Insert(ctx context.Context, tx *sql.Tx, vehicle *entity.Vehicle) (id int64, err error)
+	Update(ctx context.Context, tx *sql.Tx, id int64, updateFields map[string]any) (err error)
+	FindOne(ctx context.Context, coloumn string, value any) (vehicle *vehicleResponses, err error)
 	FindOneByLicensePlate(ctx context.Context, licensePlate string) (vehicle *vehicleResponses, err error)
 	FindVehiclesByUser(ctx context.Context, userId int64) (vehicles []vehicleResponses, err error)
 }
@@ -45,8 +49,8 @@ func (repo *RepositoryImpl) Insert(ctx context.Context, tx *sql.Tx, vehicle *ent
 	}
 
 	command := fmt.Sprintf(`
-	INSERT INTO %s 
-	SET 
+	INSERT INTO %s
+	SET
 		id = ?,
 		user_id = ?,
 		type = ?,
@@ -68,6 +72,45 @@ func (repo *RepositoryImpl) Insert(ctx context.Context, tx *sql.Tx, vehicle *ent
 		return
 	}
 	return
+}
+
+func (repo *RepositoryImpl) FindOne(ctx context.Context, coloumn string, value any) (vehicle *vehicleResponses, err error) {
+
+	var cmd SqlCommand = repo.DB
+	query := fmt.Sprintf(`
+	SELECT
+		v.id,
+		v.type,
+		v.model,
+		v.license_plate,
+		v.manufacture,
+		v.in_use,
+		v.capacity,
+		v.created_at,
+		u.id,
+		u.name,
+		u.email,
+		u.phone_number
+	FROM %s v
+	LEFT JOIN users u ON u.id = v.user_id
+	WHERE u.%s = ?
+	`, repo.TableName, coloumn)
+
+	vehicles, err := repo.Query(ctx, cmd, query, value)
+	if err != nil {
+		return
+	}
+
+	lengthOfVehicles := len(vehicles)
+	if lengthOfVehicles < 1 {
+		err = exception.ErrNotFound
+		return
+	}
+
+	vehicle = &vehicles[lengthOfVehicles-1]
+
+	return
+
 }
 
 func (repo *RepositoryImpl) FindOneByLicensePlate(ctx context.Context, licensePlate string) (vehicle *vehicleResponses, err error) {
@@ -141,6 +184,45 @@ func (repo *RepositoryImpl) FindVehiclesByUser(ctx context.Context, userId int64
 		return
 	}
 
+	return
+}
+
+func (repo *RepositoryImpl) Update(ctx context.Context, tx *sql.Tx, id int64, updateFields map[string]any) (err error) {
+	var cmd SqlCommand = repo.DB
+
+	if tx != nil {
+		cmd = tx
+	}
+
+	var (
+		placeholders []string
+		values       []interface{}
+	)
+
+	for field, value := range updateFields {
+		placeholders = append(placeholders, field+" = ?")
+		values = append(values, value)
+	}
+
+	placeholdersStr := strings.Join(placeholders, ", ")
+
+	command := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", repo.TableName, placeholdersStr)
+	values = append(values, id)
+
+	_, err = Exec(ctx, cmd, command, values...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return exception.ErrNotFound
+		}
+		if driverErr, ok := err.(*mysql.MySQLError); ok {
+			if driverErr.Number == 1062 {
+				repo.Logger.Error(err.Error())
+				return exception.ErrConflict
+			}
+		}
+		repo.Logger.Error(err.Error())
+		return exception.ErrInternalServer
+	}
 	return
 }
 

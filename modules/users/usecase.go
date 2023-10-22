@@ -22,7 +22,7 @@ type Usecase interface {
 	UserLogin(ctx context.Context, payload *model.UserLogin) responses.Responses
 	GetProfile(ctx context.Context) responses.Responses
 	UpdateCoordinate(ctx context.Context, payload *model.Coordinate) responses.Responses
-	TopUpCoinBalance(ctx context.Context, payload *model.TopUpCoinBalance) responses.Responses
+	// TopUpCoinBalance(ctx context.Context, payload *model.TopUpCoinBalance) responses.Responses
 	ChangePhoneNumber(ctx context.Context, payload *model.ChangePhoneNumber) responses.Responses
 	ChangePassword(ctx context.Context, payload *model.ChangePassword) responses.Responses
 
@@ -177,7 +177,6 @@ func (u *UsecaseImpl) UserLogin(ctx context.Context, payload *model.UserLogin) r
 
 	passwordMatch := cryptography.Verify(*user.Password, []byte(payload.Password))
 	if !passwordMatch {
-		u.Logger.WithFields(logrus.Fields{"body": payload}).Error("invalid credential")
 		return httpResponse.BadRequest("").NewResponses(nil, "invalid credential")
 	}
 
@@ -253,30 +252,30 @@ func (u *UsecaseImpl) UpdateCoordinate(ctx context.Context, payload *model.Coord
 	return httpResponse.Ok("").NewResponses(nil, "Coordinate updated")
 }
 
-func (u *UsecaseImpl) TopUpCoinBalance(ctx context.Context, payload *model.TopUpCoinBalance) responses.Responses {
-	var tx *sql.Tx
+// func (u *UsecaseImpl) TopUpCoinBalance(ctx context.Context, payload *model.TopUpCoinBalance) responses.Responses {
+// 	var tx *sql.Tx
 
-	user, err := u.Repository.FindOneById(ctx, payload.ID)
-	if err != nil && err != exception.ErrNotFound {
-		u.Logger.WithField("requester", payload).Error(err.Error())
-		return httpResponse.InternalServerError("").NewResponses(nil, err.Error())
-	}
+// 	user, err := u.Repository.FindOneById(ctx, payload.ID)
+// 	if err != nil && err != exception.ErrNotFound {
+// 		u.Logger.WithField("requester", payload).Error(err.Error())
+// 		return httpResponse.InternalServerError("").NewResponses(nil, err.Error())
+// 	}
 
-	if user == nil {
-		return httpResponse.NotFound("").NewResponses(nil, err.Error())
-	}
+// 	if user == nil {
+// 		return httpResponse.NotFound("").NewResponses(nil, err.Error())
+// 	}
 
-	topUpBalance := map[string]any{
-		"coin": user.Coin + payload.Coin,
-	}
+// 	topUpBalance := map[string]any{
+// 		"coin": user.Coin + payload.Coin,
+// 	}
 
-	if err := u.Repository.Update(ctx, tx, payload.ID, topUpBalance); err != nil {
-		u.Logger.WithField("requester", payload).Error(err.Error())
-		return httpResponse.InternalServerError("").NewResponses(nil, err.Error())
-	}
+// 	if err := u.Repository.Update(ctx, tx, payload.ID, topUpBalance); err != nil {
+// 		u.Logger.WithField("requester", payload).Error(err.Error())
+// 		return httpResponse.InternalServerError("").NewResponses(nil, err.Error())
+// 	}
 
-	return httpResponse.Ok("").NewResponses(nil, "Top up success")
-}
+// 	return httpResponse.Ok("").NewResponses(nil, "Top up success")
+// }
 
 func (u *UsecaseImpl) ChangePhoneNumber(ctx context.Context, payload *model.ChangePhoneNumber) responses.Responses {
 	var tx *sql.Tx

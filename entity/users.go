@@ -9,13 +9,13 @@ type Users struct {
 	Name            string            `json:"name"`
 	Email           string            `json:"email"`
 	PhoneNumber     string            `json:"phoneNumber"`
-	Password        *string           `json:"password"`
+	Password        *string           `json:"password,omitempty"`
 	Coin            int64             `json:"coin"`
 	Coordinate      *Coordinate       `json:"coordinate"`
 	IsEmailVerified bool              `json:"isEmailVerified"`
 	EmailVerifiedAt *time.Time        `json:"emailVerifiedAt"`
 	IsDriver        bool              `json:"isDriver"`
-	Vehicles        []*VehiclesInUser `json:"vehicles"`
+	Vehicles        []*VehiclesInUser `json:"vehicles,omitempty"`
 	CreatedAt       time.Time         `json:"createdAt"`
 	UpdatedAt       *time.Time        `json:"updatedAt"`
 }

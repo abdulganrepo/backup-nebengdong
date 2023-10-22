@@ -10,6 +10,5 @@ type ShareRide struct {
 	CreatedAt    time.Time      `json:"createdAt"`
 	FinishedAt   *time.Time     `json:"finishedAt"`
 	Passengers   []*Passengers  `json:"passengers"`
-	Users        *UserInVehicle `json:"users"`
 	Driver       *UserInVehicle `json:"driver"`
 }

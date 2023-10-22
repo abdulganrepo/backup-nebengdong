@@ -209,14 +209,20 @@ func (repo *RepositoryImpl) FindOnePassengerOnShareRide(ctx context.Context, sha
 		p.distance,
 		p.created_at,
 		p.dropped_at,
-		p.share_ride_id
+		p.share_ride_id,
+		pyt.status,
+		pyt.total_amount,
+		pytd.payment_method,
+		pytd.amount
 	FROM
-		%s p
+	%s p
+		LEFT JOIN payment pyt ON pyt.passenger_id = p.id
+		LEFT JOIN payment_detail pytd ON pytd.payment_id = pyt.id
 	WHERE
 		p.share_ride_id = ? AND p.id = ?
 	`, repo.TableName)
 
-	passengers, err := repo.Query(ctx, cmd, query, shareRideId, passengerId)
+	passengers, err := repo.QueryRelationship(ctx, cmd, query, shareRideId, passengerId)
 	if err != nil {
 		return
 	}
@@ -278,7 +284,7 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 
 	var passenger entity.Passengers
 
-	if rows.Next() {
+	for rows.Next() {
 		err = rows.Scan(&passenger.ID, &passenger.UserId, &passenger.Status, &passenger.DestinationCoordinate.Latitude, &passenger.DestinationCoordinate.Longitude, &passenger.Distance, &passenger.CreatedAt, &passenger.DroppedAt, &passenger.ShareRideId)
 		if err != nil {
 			repo.Logger.Error(err.Error())
@@ -286,11 +292,77 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 		}
 
 		passengers = append(passengers, passenger)
-	} else {
-		if passengers == nil {
-			err = exception.ErrNotFound
+	}
+
+	if passengers == nil {
+		err = exception.ErrNotFound
+		return
+	}
+
+	return
+}
+
+func (repo *RepositoryImpl) QueryRelationship(ctx context.Context, cmd SqlCommand, query string, args ...interface{}) (passengers []entity.Passengers, err error) {
+
+	var rows *sql.Rows
+	if rows, err = cmd.QueryContext(ctx, query, args...); err != nil {
+		repo.Logger.Error(err.Error())
+		return
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			repo.Logger.Error(err.Error())
 			return
 		}
+	}()
+
+	var passenger entity.Passengers
+	var payment entity.Payment
+	var paymentDetails entity.PaymentDetails
+
+	for rows.Next() {
+
+		var (
+			paymentStatus      sql.NullString
+			paymentTotalAmount sql.NullInt64
+		)
+
+		var (
+			paymentDetailPaymentMethod sql.NullString
+			paymentDetailAmount        sql.NullInt64
+		)
+
+		err = rows.Scan(&passenger.ID, &passenger.UserId, &passenger.Status, &passenger.DestinationCoordinate.Latitude, &passenger.DestinationCoordinate.Longitude, &passenger.Distance, &passenger.CreatedAt, &passenger.DroppedAt, &passenger.ShareRideId, &paymentStatus, &paymentTotalAmount, &paymentDetailPaymentMethod, &paymentDetailAmount)
+		if err != nil {
+			repo.Logger.Error(err.Error())
+			return
+		}
+
+		if paymentStatus.Valid {
+			payment = entity.Payment{
+				Status:      paymentStatus.String,
+				TotalAmount: paymentTotalAmount.Int64,
+			}
+
+			passenger.Payment = append(passenger.Payment, &payment)
+		}
+
+		if paymentStatus.Valid {
+			paymentDetails = entity.PaymentDetails{
+				PaymentMethod: paymentDetailPaymentMethod.String,
+				Amount:        paymentDetailAmount.Int64,
+			}
+			payment.PaymentDetails = append(payment.PaymentDetails, paymentDetails)
+		}
+
+		passengers = append(passengers, passenger)
 	}
+
+	if passengers == nil {
+		err = exception.ErrNotFound
+		return
+	}
+
 	return
 }

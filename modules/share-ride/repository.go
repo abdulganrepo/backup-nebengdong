@@ -399,7 +399,7 @@ func (repo *RepositoryImpl) FindActiveShareRideByPassenger(ctx context.Context, 
 		left join users u on u.id = sr.driver_id
 		left join users u2 on u2.id = p.user_id
 	WHERE
-		u2.id = ? AND p.status IN (1, 2, 3, 4) AND p.status = 2
+		u2.id = ? AND p.status IN (1, 2, 3, 4)
 	`, repo.TableName)
 
 	shareRides, err := repo.Query(ctx, cmd, query, passengerId)
@@ -467,7 +467,7 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 	var payment entity.Payment
 	var paymentDetails entity.PaymentDetails
 
-	if rows.Next() {
+	for rows.Next() {
 
 		var (
 			shareRideDriverStatus sql.NullInt16
@@ -530,6 +530,12 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 				},
 				Distance:  passengerDistance.Float64,
 				CreatedAt: passengerCreatedAt.Time,
+				User: &entity.UserInVehicle{
+					ID:          userId.Int64,
+					Name:        userName.String,
+					Email:       userEmail.String,
+					PhoneNumber: userPhoneNumber.String,
+				},
 			}
 			shareRide.Passengers = append(shareRide.Passengers, &passenger)
 		}
@@ -554,15 +560,6 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 			payment.PaymentDetails = append(payment.PaymentDetails, paymentDetails)
 		}
 
-		if userId.Valid {
-			shareRide.Users = &entity.UserInVehicle{
-				ID:          userId.Int64,
-				Name:        userName.String,
-				Email:       userEmail.String,
-				PhoneNumber: userPhoneNumber.String,
-			}
-		}
-
 		if driverId.Valid {
 			shareRide.Driver = &entity.UserInVehicle{
 				ID:          driverId.Int64,
@@ -573,11 +570,12 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 		}
 
 		shareRides = append(shareRides, shareRide)
-	} else {
-		if shareRides == nil {
-			err = exception.ErrNotFound
-			return
-		}
 	}
+
+	if shareRides == nil {
+		err = exception.ErrNotFound
+		return
+	}
+
 	return
 }

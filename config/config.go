@@ -29,6 +29,9 @@ type Config struct {
 	JWT struct {
 		PrivateKey, PublicKey []byte
 	}
+	JWTAdmin struct {
+		PrivateKey, PublicKey []byte
+	}
 	MariaDb struct {
 		Driver             string
 		Host               string
@@ -87,6 +90,16 @@ func (cfg *Config) jwt() {
 	cfg.JWT.PublicKey = publicKey
 }
 
+func (cfg *Config) jwtAdmin() {
+	privateKey, _ := os.ReadFile("./secret/admin/nebeng-dong-admin-private.key")
+	publicKey, _ := os.ReadFile("./secret/admin/nebeng-dong-admin-public.key")
+	// privateKey := []byte(strings.Replace(os.Getenv("JWT_PRIVATE_KEY"), `\n`, "\n", -1))
+	// publicKey := []byte(strings.Replace(os.Getenv("JWT_PUBLIC_KEY"), `\n`, "\n", -1))
+
+	cfg.JWTAdmin.PrivateKey = privateKey
+	cfg.JWTAdmin.PublicKey = publicKey
+}
+
 func (cfg *Config) app() {
 	appName := os.Getenv("APP_NAME")
 	port := os.Getenv("PORT")
@@ -125,6 +138,7 @@ func Load() *Config {
 	cfg := new(Config)
 	cfg.app()
 	cfg.jwt()
+	cfg.jwtAdmin()
 	cfg.mariaDb()
 	cfg.basicAuth()
 	cfg.logFormatter()

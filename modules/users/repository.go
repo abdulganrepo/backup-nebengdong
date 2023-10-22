@@ -8,6 +8,7 @@ import (
 
 	"github.com/Difaal21/nebeng-dong/entity"
 	"github.com/Difaal21/nebeng-dong/exception"
+	"github.com/Difaal21/nebeng-dong/model"
 	"github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 )
@@ -17,6 +18,8 @@ type Repository interface {
 	RollbackTx(ctx context.Context, tx *sql.Tx) (err error)
 	CommitTx(ctx context.Context, tx *sql.Tx) (err error)
 
+	CountFindManyUser(ctx context.Context, params *model.GetManyUserParams) (totalData int64, err error)
+	FindManyUser(ctx context.Context, params *model.GetManyUserParams) (users []entity.Users, err error)
 	FindOneByEmail(ctx context.Context, email string) (users *entity.Users, err error)
 	FindOneById(ctx context.Context, id int64) (users *entity.Users, err error)
 	FindOne(ctx context.Context, coloumn string, value any) (user *entity.Users, err error)
@@ -92,6 +95,52 @@ func (repo *RepositoryImpl) RollbackTx(ctx context.Context, tx *sql.Tx) (err err
 
 func (repo *RepositoryImpl) CommitTx(ctx context.Context, tx *sql.Tx) (err error) {
 	return tx.Commit()
+}
+
+func (repo *RepositoryImpl) CountFindManyUser(ctx context.Context, params *model.GetManyUserParams) (totalData int64, err error) {
+
+	var cmd SqlCommand = repo.DB
+
+	q := NewQuery().BaseQueryCountSelectAllUser()
+
+	if params.IsDriver != nil {
+		q.AddFilter("u.is_driver", params.IsDriver)
+	}
+
+	totalData, err = repo.QueryCount(ctx, cmd, q.GetQuery(), q.GetParams()...)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (repo *RepositoryImpl) FindManyUser(ctx context.Context, params *model.GetManyUserParams) (users []entity.Users, err error) {
+	var cmd SqlCommand = repo.DB
+
+	var offset = (params.Page - 1) * params.Size
+
+	q := NewQuery().BaseQuerySelectAllUser()
+
+	if params.IsDriver != nil {
+		q.AddFilter("u.is_driver", params.IsDriver)
+	}
+
+	q.AddLimit(params.Size)
+	q.AddOffset(offset)
+
+	users, err = repo.QuerySelectAllUser(ctx, cmd, q.GetQuery(), q.GetParams()...)
+	if err != nil {
+		return
+	}
+
+	lengthOfUsers := len(users)
+	if lengthOfUsers < 1 {
+		err = exception.ErrNotFound
+		return
+	}
+
+	return
 }
 
 func (repo *RepositoryImpl) FindOne(ctx context.Context, coloumn string, value any) (user *entity.Users, err error) {
@@ -338,7 +387,7 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 
 	var user entity.Users
 	vehicle := &entity.VehiclesInUser{}
-	if rows.Next() {
+	for rows.Next() {
 
 		var (
 			coordinateLatitue   sql.NullFloat64
@@ -394,11 +443,81 @@ func (repo *RepositoryImpl) Query(ctx context.Context, cmd SqlCommand, query str
 		}
 
 		users = append(users, user)
-	} else {
-		if users == nil {
-			err = exception.ErrNotFound
+	}
+
+	if users == nil {
+		err = exception.ErrNotFound
+		return
+	}
+
+	return
+}
+
+func (repo *RepositoryImpl) QueryCount(ctx context.Context, cmd SqlCommand, query string, args ...interface{}) (totalData int64, err error) {
+	var rows *sql.Rows
+
+	if rows, err = cmd.QueryContext(ctx, query, args...); err != nil {
+		repo.Logger.WithContext(ctx).Error(query, err)
+		return
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			repo.Logger.WithContext(ctx).Error(query, err)
+		}
+	}()
+
+	for rows.Next() {
+		err = rows.Scan(&totalData)
+	}
+
+	return
+}
+
+func (repo *RepositoryImpl) QuerySelectAllUser(ctx context.Context, cmd SqlCommand, query string, args ...interface{}) (users []entity.Users, err error) {
+
+	var rows *sql.Rows
+	if rows, err = cmd.QueryContext(ctx, query, args...); err != nil {
+		repo.Logger.Error(err.Error())
+		return
+	}
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			repo.Logger.Error(err.Error())
 			return
 		}
+	}()
+
+	var user entity.Users
+	for rows.Next() {
+
+		var (
+			coordinateLatitue   sql.NullFloat64
+			coordinateLongitude sql.NullFloat64
+		)
+
+		err = rows.Scan(&user.ID, &user.Name, &user.Email, &user.PhoneNumber, &user.Coin, &coordinateLatitue, &coordinateLongitude, &user.IsEmailVerified, &user.EmailVerifiedAt, &user.IsDriver, &user.CreatedAt, &user.UpdatedAt)
+
+		if err != nil {
+			repo.Logger.Error(err.Error())
+			return
+		}
+
+		if coordinateLatitue.Valid && coordinateLongitude.Valid {
+			user.Coordinate = &entity.Coordinate{
+				Latitude:  coordinateLatitue.Float64,
+				Longitude: coordinateLongitude.Float64,
+			}
+		}
+
+		users = append(users, user)
 	}
+
+	if users == nil {
+		err = exception.ErrNotFound
+		return
+	}
+
 	return
 }

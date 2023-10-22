@@ -265,6 +265,16 @@ func (u *UsecaseImpl) UpdatePassengerStatusOnShareRide(ctx context.Context, payl
 		return httpResponse.NotFound("").NewResponses(nil, "share ride not found")
 	}
 
+	requester, err := model.GetRequester(ctx)
+	if err != nil {
+		u.Logger.WithField("requester", requester).Error(err.Error())
+		return httpResponse.InternalServerError("").NewResponses(nil, err.Error())
+	}
+
+	if shareRide.DriverId != requester.ID {
+		return httpResponse.Forbidden("").NewResponses(nil, "not eligible driver to update status")
+	}
+
 	passenger, err := u.PassengerRepository.FindOnePassengerOnShareRide(ctx, shareRide.ID, payload.ID)
 	if err != nil && err != exception.ErrNotFound {
 		u.Logger.WithField("payload", payload).Error(err.Error())
